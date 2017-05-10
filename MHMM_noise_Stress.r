@@ -1,29 +1,36 @@
-data_set2 <- read.csv("train_HMM_Sound.csv") 
-#data_set <- data_set2
-data_set <- data_set2[1:5000,]
+library(boot)
+library(CircStats)
+library(Hmisc)
+
+data_set_all <- read.csv("train_HMM_Sound.csv") 
+#data_set <- data_set_all
+data_set <- data_set_all[1:5000,]
 data_set$P_ID <- factor(data_set$P_ID)
 
-data_in <- data_set[,c("P_ID", "Soundm","Age","Noise_sensitivity","ToDAfternoon","ToDEvening",       
-"GenderFemale", "SDNN")]
+data_in <- data_set[,c("P_ID", "Soundm","Age","Noise_sensitivity","ToDAfternoon",
+"ToDEvening", "GenderFemale", "SDNN")]
 
 data_in_split <- split(data_in,data_in$P_ID)
 
-## K method: K is number of participants and that many normal distributions to be estimated
-## variable names:
+## K method: K is number of participants and that many normal distributions 
+#  to be estimated
+## VARIABLE NAMES:
 ## delta = Markov chain initial state distribution
 ## intercept = Intercept values of transition probability stochastic function
-## betaS = Coefficients of covariates in the logit regression for transition probabilities
+## betaS = Coefficients of covariates in the logit regression for 
+#  transition probabilities
 ## mu = Mean of the Normal desnity assumed for state distribution probability 
 #  function or emission probability
 ## sigma = Std. deviation of the Normal desnity assumed for state distribution 
-# probability function or emission probability
+#  probability function or emission probability
 
 ## Natural parameters to working parameters
 pn2pw_mix <- function(delta,intercept,betaS,mu,sigma)
 { 
   tdelta <- logit(delta)     ## Transfrom from [0,1] to (-inf,inf)
   tsigma <- log(sigma)        ## Transfrom from [0,inf) to (-inf,inf)
-  ## No need of transformation for mu, intercept, betaS as they are already unconstrained
+  ## No need of transformation for mu, intercept, betaS as they 
+  #  are already unconstrained
   parvect <- c(tdelta,intercept,betaS,mu,tsigma) 
   return(parvect)
 }
@@ -113,13 +120,16 @@ mle_mix <- function(data_in,X,delta0,intercept0,betaS0,mu0,sigma0)
 {
   parvect0<-pn2pw_mix(delta0,intercept0,betaS0,mu0,sigma0)               
   
-  ## NUMERICAL OPTIMIZATION of parameters using packages 'nlm' and methods in 'optim' package. 
+  ## NUMERICAL OPTIMIZATION of parameters using packages 'nlm' and methods 
+  # in 'optim' package. 
   # We tried different methods in optim, 'BFGS' is shown below. 
-  # The control parameters for nlm and optim methods were also tweaked to check speed of estimation 
+  # The control parameters for nlm and optim methods were also tweaked 
+  # to check speed of estimation 
   
   #mod <- nlm(mllk_mix,X=X,parvect0,print.level=2,iterlim=200,stepmax=5,
   hessian=F,ndigit=4,steptol=1e-4,gradtol=1e-4)
-  #mod <- nlm(mllk_mix,X=X,parvect0,print.level=2,iterlim=1500,stepmax=5,hessian=F,ndigit=4)
+  #mod <- nlm(mllk_mix,X=X,parvect0,print.level=2,iterlim=1500,
+  # stepmax=5,hessian=F,ndigit=4)
   mod <- optim(parvect0,mllk_mix,X=X,method="BFGS",hessian=F)
   pn<-pw2pn_mix(mod$estimate,K=length(X))   
   mllk <- mod$minimum 
@@ -127,10 +137,12 @@ mle_mix <- function(data_in,X,delta0,intercept0,betaS0,mu0,sigma0)
   AIC <- 2*(mllk+np)
   n <- nrow(data_in)
   BIC <- 2*mllk+np*log(n)
-  list(mu=pn$mu,sigma= pn$sigma, delta = pn$delta, intercept = pn$intercept, betaS=pn$betaS,mllk=mllk,AIC=AIC,BIC=BIC)
+  list(mu=pn$mu,sigma= pn$sigma, delta = pn$delta, intercept = pn$intercept, 
+  betaS=pn$betaS,mllk=mllk,AIC=AIC,BIC=BIC)
 }
 
-## Repeat below code for each optimization technique (i.e. using nlm, optim(CG), optim(BFGS), etc)
+## Repeat below code for each optimization technique 
+# (i.e. using nlm, optim(CG), optim(BFGS), etc)
 system.time(
   HMM_mix1 <- mle_mix(data_in,data_in_split,delta0,intercept0,betaS0,mu0,sigma0)
 )
